@@ -1,0 +1,62 @@
+# Dependencies
+node_modules
+npm-debug.log*
+bun-debug.log*
+
+# Build outputs
+dist
+*.tsbuildinfo
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Documentation
+README.md
+CHANGELOG.md
+docs/
+
+# Testing
+coverage/
+*.test.ts
+*.spec.ts
+tests/
+
+# Development files
+.eslintrc*
+.prettierrc*
+tsconfig.json
+
+# Docker files
+Dockerfile
+Dockerfile.*
+docker-compose*.yml
+.dockerignore
+
+# Logs
+logs
+*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# OS
+.DS_Store
+Thumbs.db

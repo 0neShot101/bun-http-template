@@ -1,93 +1,241 @@
-# express-template
+# Bun HTTP Template
 
+A modern, type-safe HTTP server template built with Bun, TypeScript, and custom routing architecture.
 
+## Features
 
-## Getting started
+- 🚀 **Bun Runtime** - Fast, modern JavaScript runtime with built-in bundler and test runner
+- 📁 **File-based Routing** - Automatic route discovery and registration
+- 🛡️ **Type Safety** - Full TypeScript support with strict type checking
+- 🔧 **Middleware Support** - Composable middleware system with route-level configuration
+- 📊 **Structured Logging** - Production-ready logging with Pino
+- 🐳 **Docker Ready** - Containerized deployment with multi-stage builds
+- 🧪 **Comprehensive Testing** - Unit and integration tests with Bun's test runner
+- 🔍 **Code Quality** - ESLint, Prettier, and TypeScript configuration
+- ⚡ **Hot Reload** - Development server with automatic restart
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## Quick Start
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+### Prerequisites
 
-## Add your files
+- [Bun](https://bun.sh/) >= 1.0.0
+- Node.js >= 18 (for some development tools)
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+### Installation
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd bun-http-template
+
+# Install dependencies
+bun install
+
+# Start development server
+bun run dev
+```
+
+The server will start on `http://localhost:3000` with hot reload enabled.
+
+## Scripts
+
+| Command | Description |
+|---------|-------------|
+| `bun run dev` | Start development server with hot reload |
+| `bun run build` | Build the application for production |
+| `bun run start` | Start the production server |
+| `bun run test` | Run all tests |
+| `bun run test:watch` | Run tests in watch mode |
+| `bun run test:coverage` | Run tests with coverage report |
+| `bun run lint` | Run ESLint |
+| `bun run lint:fix` | Run ESLint and fix issues |
+| `bun run format` | Format code with Prettier |
+| `bun run type-check` | Run TypeScript type checking |
+| `bun run docker:build` | Build Docker image |
+| `bun run docker:run` | Run Docker container |
+
+## Project Structure
 
 ```
-cd existing_repo
-git remote add origin http://gitlab.mewski.dev/Andrew/express-template.git
-git branch -M main
-git push -uf origin main
+src/
+├── index.ts              # Application entry point
+├── http.ts              # HTTP server setup and route loading
+├── middleware/          # Middleware functions
+│   └── logging.ts       # Request logging middleware
+├── routes/             # File-based routes
+│   └── index.ts        # Root route handler
+├── structures/         # Core classes and builders
+│   └── RouteBuilder.ts # Route definition and middleware builder
+├── types/              # TypeScript type definitions
+│   ├── routing.ts      # Route and middleware types
+│   └── server.ts       # Server configuration types
+└── utils/              # Utility functions
+    ├── logger.ts       # Logging configuration
+    └── walkDirectory.ts # File system utilities
+
+tests/                  # Test suite
+├── unit/              # Unit tests
+├── integration/       # Integration tests
+├── helpers/           # Test utilities
+├── fixtures/          # Test data and mocks
+└── setup.ts           # Test configuration
 ```
 
-## Integrate with your tools
+## Routing
 
-- [ ] [Set up project integrations](http://gitlab.mewski.dev/Andrew/express-template/-/settings/integrations)
+This template uses a file-based routing system where each file in the `src/routes/` directory automatically becomes a route.
 
-## Collaborate with your team
+### Creating Routes
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+Create a new file in `src/routes/` and export a `RouteBuilder` instance:
 
-## Test and Deploy
+```typescript
+// src/routes/users.ts
+import RouteBuilder from '@structures/RouteBuilder';
 
-Use the built-in continuous integration in GitLab.
+export default new RouteBuilder()
+  .on('get', async (req) => {
+    return Response.json({ users: [] });
+  })
+  .on('post', async (req) => {
+    const body = await req.json();
+    return Response.json({ created: body });
+  });
+```
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+### Route Parameters
 
-***
+Use underscores in filenames to create parameterized routes:
 
-# Editing this README
+- `src/routes/users/_id.ts` → `/users/:id`
+- `src/routes/posts/_slug/comments.ts` → `/posts/:slug/comments`
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+### Middleware
 
-## Suggestions for a good README
+Apply middleware per route or per HTTP method:
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+```typescript
+import RouteBuilder from '@structures/RouteBuilder';
+import authMiddleware from '@middleware/auth';
+import validation from '@middleware/validation';
 
-## Name
-Choose a self-explaining name for your project.
+export default new RouteBuilder({
+  // Apply to all methods
+  '*': [authMiddleware],
+  // Apply only to POST
+  'post': validation
+}).on('get', async (req) => {
+  // Handler code
+});
+```
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+## Testing
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+The project includes a comprehensive test suite using Bun's built-in test runner.
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+### Running Tests
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+```bash
+# Run all tests
+bun test
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+# Run specific test file
+bun test tests/unit/RouteBuilder.test.ts
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+# Run tests with coverage
+bun test --coverage
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+# Watch mode for development
+bun test --watch
+```
+
+### Test Structure
+
+- **Unit Tests** - Test individual components in isolation
+- **Integration Tests** - Test the complete HTTP server functionality
+- **Test Helpers** - Utilities for creating requests, assertions, and mocks
+- **Fixtures** - Sample data and configurations for testing
+
+### Writing Tests
+
+```typescript
+import { describe, expect, it } from 'bun:test';
+
+describe('Component', () => {
+  it('should do something', () => {
+    expect(true).toBe(true);
+  });
+});
+```
+
+## Environment Variables
+
+Create a `.env` file in the root directory:
+
+```env
+NODE_ENV=development
+PORT=3000
+LOG_LEVEL=info
+```
+
+## Docker
+
+### Build and Run
+
+```bash
+# Build the image
+bun run docker:build
+
+# Run the container
+bun run docker:run
+```
+
+## Development
+
+### Code Quality
+
+This project enforces code quality through:
+
+- **TypeScript** - Static type checking
+- **ESLint** - Code linting with TypeScript rules
+- **Prettier** - Code formatting
+- **Bun Test** - Unit and integration testing
+
+### Pre-commit Hooks
+
+Run quality checks before committing:
+
+```bash
+bun run lint:fix
+bun run format
+bun run type-check
+bun run test
+```
+
+## API Endpoints
+
+### Health Checks
+
+- `GET /health` - Basic health check
+- `GET /health/ready` - Readiness probe
+
+### Default Routes
+
+- `GET /` - Hello world endpoint
 
 ## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Run the test suite
+6. Submit a pull request
 
 ## License
-For open source projects, say how it is licensed.
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## Author
+
+Andrew Tandy

@@ -1,0 +1,25 @@
+{
+  "Route Builder": {
+    "prefix": "route",
+    "body": [
+      "import RouteBuilder from '@structures/RouteBuilder';",
+      "",
+      "export default new RouteBuilder()",
+      "  .on('${1|get,post,put,delete,patch|}', async (request, server) => {",
+      "    $2",
+      "  });"
+    ],
+    "description": "export default new RouteBuilder().on(method, async (request, server) => { … })"
+  },
+  "Middleware Starter": {
+    "prefix": "middleware",
+    "body": [
+      "import { Server } from 'bun';",
+      "",
+      "export default async (request: Request, server: Server) => {",
+      "  $1",
+      "};"
+    ],
+    "description": "Basic Bun middleware stub"
+  }
+}

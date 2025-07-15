@@ -235,7 +235,3 @@ bun run test
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
-
-## Author
-
-Andrew Tandy

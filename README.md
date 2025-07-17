@@ -34,7 +34,7 @@ A modern, type-safe HTTP server template built with Bun, TypeScript, Zod schema 
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/0neShot101/bun-http-template.git
 cd bun-http-template
 
 # Install dependencies

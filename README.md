@@ -1,12 +1,13 @@
 # Bun HTTP Template
 
-A modern, type-safe HTTP server template built with Bun, TypeScript, and custom routing architecture.
+A modern, type-safe HTTP server template built with Bun, TypeScript, Zod schema validation, and custom routing architecture.
 
 ## Features
 
 - 🚀 **Bun Runtime** - Fast, modern JavaScript runtime with built-in bundler and test runner
 - 📁 **File-based Routing** - Automatic route discovery and registration
 - 🛡️ **Type Safety** - Full TypeScript support with strict type checking
+- ✅ **Schema Validation** - Runtime request validation with Zod and automatic type inference
 - 🔧 **Middleware Support** - Composable middleware system with route-level configuration
 - 📊 **Structured Logging** - Production-ready logging with Pino
 - 🐳 **Docker Ready** - Containerized deployment with multi-stage builds
@@ -20,6 +21,14 @@ A modern, type-safe HTTP server template built with Bun, TypeScript, and custom 
 
 - [Bun](https://bun.sh/) >= 1.0.0
 - Node.js >= 18 (for some development tools)
+
+### Key Dependencies
+
+- **Bun** - JavaScript runtime and package manager
+- **TypeScript** - Static type checking
+- **Zod** - Schema validation and type inference
+- **Pino** - Fast, low overhead logging
+- **@3xpo/events** - Type-safe event emitter
 
 ### Installation
 
@@ -36,6 +45,32 @@ bun run dev
 ```
 
 The server will start on `http://localhost:3000` with hot reload enabled.
+
+### Quick Example
+
+Create a new route with schema validation:
+
+```typescript
+// src/routes/example.ts
+import RouteBuilder from '@structures/RouteBuilder';
+
+export default new RouteBuilder()
+  .schema('post', (z) => ({
+    body: z.object({
+      message: z.string().min(1),
+      priority: z.enum(['low', 'medium', 'high']).default('medium')
+    })
+  }))
+  .on('post', async (req) => {
+    // req.body is fully typed!
+    const { message, priority } = req.body;
+    return Response.json({ 
+      received: message, 
+      priority,
+      timestamp: new Date().toISOString()
+    });
+  });
+```
 
 ## Scripts
 
@@ -68,6 +103,7 @@ src/
 │   └── RouteBuilder.ts # Route definition and middleware builder
 ├── types/              # TypeScript type definitions
 │   ├── routing.ts      # Route and middleware types
+│   ├── schema.ts       # Schema validation types
 │   └── server.ts       # Server configuration types
 └── utils/              # Utility functions
     ├── logger.ts       # Logging configuration
@@ -103,6 +139,46 @@ export default new RouteBuilder()
   });
 ```
 
+### Schema Validation
+
+Use Zod schemas to validate incoming requests with full type safety:
+
+```typescript
+// src/routes/users.ts
+import RouteBuilder from '@structures/RouteBuilder';
+
+const createUserSchema = {
+  body: z.object({
+    name: z.string().min(1),
+    email: z.string().email(),
+    age: z.number().min(18)
+  }),
+  query: z.object({
+    source: z.string().optional()
+  })
+};
+
+export default new RouteBuilder()
+  .schema('post', (z) => createUserSchema)
+  .on('post', async (req) => {
+    // req.body and req.query are now fully typed!
+    const { name, email, age } = req.body; // TypeScript knows these types
+    const { source } = req.query;
+    
+    return Response.json({ 
+      created: { name, email, age },
+      source: source || 'direct'
+    });
+  });
+```
+
+**Validation Features:**
+- **Body Validation** - Validate JSON request bodies
+- **Query Parameters** - Validate URL query parameters  
+- **Headers** - Validate request headers
+- **Automatic Errors** - Returns 400 with detailed error messages
+- **Type Safety** - Full TypeScript inference for validated data
+
 ### Route Parameters
 
 Use underscores in filenames to create parameterized routes:
@@ -124,9 +200,90 @@ export default new RouteBuilder({
   '*': [authMiddleware],
   // Apply only to POST
   'post': validation
-}).on('get', async (req) => {
+})
+.schema('post', (z) => ({
+  body: z.object({
+    title: z.string(),
+    content: z.string()
+  })
+}))
+.on('get', async (req) => {
   // Handler code
+})
+.on('post', async (req) => {
+  // req.body is typed as { title: string, content: string }
+  const { title, content } = req.body;
+  return Response.json({ created: { title, content } });
 });
+```
+
+**Middleware runs in this order:**
+1. Route-level middleware (from constructor)
+2. Schema validation middleware (automatically added)
+3. Route handler
+
+## Schema Validation
+
+The template includes powerful runtime validation using [Zod](https://zod.dev/) with full TypeScript integration.
+
+### Defining Schemas
+
+Define validation schemas for any HTTP method using the `schema()` method:
+
+```typescript
+import RouteBuilder from '@structures/RouteBuilder';
+
+export default new RouteBuilder()
+  .schema('post', (z) => ({
+    // Validate request body
+    body: z.object({
+      name: z.string().min(1),
+      email: z.string().email(),
+      age: z.number().min(18).max(120)
+    }),
+    // Validate query parameters
+    query: z.object({
+      includeProfile: z.boolean().optional(),
+      format: z.enum(['json', 'xml']).default('json')
+    }),
+    // Validate headers
+    headers: z.object({
+      'x-api-key': z.string().min(10)
+    })
+  }))
+  .on('post', async (req) => {
+    // All validated data is now available with full type safety
+    const { name, email, age } = req.body;
+    const { includeProfile, format } = req.query;
+    const apiKey = req.headers['x-api-key'];
+    
+    return Response.json({ success: true });
+  });
+```
+
+### Validation Features
+
+- **Automatic Type Inference** - Request objects are automatically typed based on schemas
+- **Runtime Validation** - Invalid requests return 400 with detailed error messages
+- **Multiple Parts** - Validate body, query parameters, and headers independently
+- **Zod Integration** - Use any Zod validation features (transforms, refinements, etc.)
+- **Error Handling** - Graceful error responses with validation details
+
+### Advanced Schema Usage
+
+```typescript
+// Complex validation with transforms and custom validations
+.schema('post', (z) => ({
+  body: z.object({
+    email: z.string().email().transform(val => val.toLowerCase()),
+    tags: z.array(z.string()).min(1).max(5),
+    metadata: z.record(z.string(), z.any()).optional(),
+    publishedAt: z.string().datetime().transform(val => new Date(val))
+  }).refine(data => {
+    // Custom validation logic
+    return data.tags.every(tag => tag.length > 0);
+  }, { message: "Tags cannot be empty" })
+}))
 ```
 
 ## Testing

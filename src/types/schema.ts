@@ -1,29 +1,6 @@
 import type { BunRequest, Server } from 'bun';
 import type { z } from 'zod';
 
-/* == Core & Public Types == */
-
-/** Basic event map for the EventEmitter. */
-export type Event = Record<string, (...args: any[]) => any>;
-
-/** Supported HTTP methods for the route builder. */
-export type RouteMethod = 'get' | 'post' | 'put' | 'delete' | 'patch' | 'head' | 'options';
-
-/** A basic route handler function. */
-export type RouteHandler = (request: BunRequest, server: Server) => any;
-
-/**
- * A middleware function. It can return a Response to halt the request,
- * false for a 403 Forbidden, or nothing to continue to the next function.
- */
-export type Middleware = (
-  request: BunRequest,
-  server: Server,
-) => Promise<void | Response | boolean> | void | Response | boolean;
-
-/** A map of HTTP methods to their corresponding middleware. */
-export type MiddlewareMap = Partial<Record<RouteMethod, Middleware | Middleware[]>>;
-
 /** Defines the shape for Zod validation schemas for different parts of a request. */
 export interface ValidationSchemas {
   body?: z.ZodSchema;

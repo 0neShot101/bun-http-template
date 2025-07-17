@@ -1,14 +1,8 @@
 import EventEmitter from '@3xpo/events';
 import { z } from 'zod';
 
-import type {
-  Middleware,
-  MiddlewareMap,
-  RouteHandler,
-  RouteMethod,
-  TypedRouteHandler,
-  ValidationSchemas,
-} from '@typings/schema';
+import type { Middleware, MiddlewareMap, RouteHandler, RouteMethod } from '@typings/routing';
+import type { TypedRouteHandler, ValidationSchemas } from '@typings/schema';
 import type { BunRequest, Server } from 'bun';
 
 /**

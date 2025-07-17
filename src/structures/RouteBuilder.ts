@@ -1,50 +1,71 @@
 import EventEmitter from '@3xpo/events';
+import { z } from 'zod';
 
-import type { Event, Middleware, MiddlewareMap, RouteHandler, RouteMethod } from '@typings/routing';
+import type {
+  Middleware,
+  MiddlewareMap,
+  RouteHandler,
+  RouteMethod,
+  TypedRouteHandler,
+  ValidationSchemas,
+} from '@typings/schema';
 import type { BunRequest, Server } from 'bun';
 
 /**
- * Utility function to normalize values into readonly arrays.
- * @template T - The type of the value(s) to convert
- * @param value - A single value, array of values, or undefined
- * @returns A readonly array containing the value(s), or empty array if undefined
+ * Creates a specific event map for the RouteBuilder, linking each route
+ * method to its corresponding typed handler. This is used to properly
+ * extend EventEmitter in a type-safe way.
  */
+type RouteBuilderEvents<S extends Partial<Record<RouteMethod, ValidationSchemas>>> = {
+  [M in RouteMethod]: TypedRouteHandler<S[M]>;
+};
+
+/** Utility function to normalize values into readonly arrays. */
 const toArray = <T>(value: T | T[] | undefined): readonly T[] =>
   value === undefined ? [] : Array.isArray(value) ? value : [value];
 
+const validationParts = [
+  {
+    'key': 'body' as const,
+    'name': 'Body',
+    'getData': (req: BunRequest) =>
+      req.json().catch(() => {
+        throw new Error('Invalid JSON in request body');
+      }),
+  },
+  {
+    'key': 'query' as const,
+    'name': 'Query',
+    'getData': (req: BunRequest) => Object.fromEntries(new URL(req.url).searchParams),
+  },
+  {
+    'key': 'headers' as const,
+    'name': 'Headers',
+    'getData': (req: BunRequest) => {
+      const headers: Record<string, string> = {};
+      req.headers.forEach((value, key) => (headers[key] = value));
+
+      return headers;
+    },
+  },
+  {
+    'key': 'params' as const,
+    'name': 'URL Parameters',
+    'getData': (req: BunRequest) => req.params,
+  },
+];
+
+// --- Route Builder Class ---
+
 /**
- * A sophisticated HTTP route builder that extends EventEmitter to provide
- * type-safe route registration with middleware support and event-driven architecture.
- *
- * @template E - Event interface extending the base Event type for route methods
- *
- * @example Basic usage
- * ```typescript
- * const route = new RouteBuilder();
- *
- * route.on('get', async (req) => {
- *   return Response.json({ message: 'Hello World!' });
- * });
- *
- * const routeTable = route.build();
- * ```
- *
- * @example With middleware
- * ```typescript
- * const authMiddleware = (req) => {
- *   if (!req.headers.get('authorization')) {
- *     return new Response('Unauthorized', { status: 401 });
- *   }
- * };
- *
- * const route = new RouteBuilder({
- *   get: authMiddleware,
- *   post: [authMiddleware, validationMiddleware]
- * });
- * ```
+ * A sophisticated HTTP route builder that provides type-safe route registration
+ * with middleware support and automatic type-inference from Zod schemas.
  */
-export default class RouteBuilder<E extends Event = Event> extends EventEmitter<E> {
-  private readonly handlers = new Map<keyof E, RouteHandler>();
+export default class RouteBuilder<
+  Schemas extends Partial<Record<RouteMethod, ValidationSchemas>> = {},
+> extends EventEmitter<RouteBuilderEvents<Schemas>> {
+  private readonly handlers = new Map<RouteMethod, (...args: any[]) => any>();
+  private readonly schemas = new Map<RouteMethod, ValidationSchemas>();
 
   private readonly middlewarePerMethod: Record<RouteMethod, readonly Middleware[]> = {
     'get': [],
@@ -56,127 +77,109 @@ export default class RouteBuilder<E extends Event = Event> extends EventEmitter<
     'options': [],
   };
 
-  /**
-   * Creates a new RouteBuilder instance with optional middleware configuration.
-   *
-   * @param middlewareMap - Optional mapping of HTTP methods to middleware functions.
-   *                       Each method can have a single middleware function or an array of functions.
-   *                       Middleware executes before the main route handler in the order specified.
-   *
-   * @example
-   * ```typescript
-   * const route = new RouteBuilder({
-   *   get: authMiddleware,
-   *   post: [authMiddleware, validationMiddleware],
-   *   put: [authMiddleware, validationMiddleware, rateLimitMiddleware]
-   * });
-   * ```
-   */
   constructor(middlewareMap?: MiddlewareMap) {
     super();
+    if (middlewareMap === undefined) return;
 
-    if (middlewareMap) {
-      (Object.keys(middlewareMap) as RouteMethod[]).forEach(method => {
-        this.middlewarePerMethod[method] = toArray(middlewareMap[method]);
-      });
-    }
+    (Object.keys(middlewareMap) as RouteMethod[]).forEach(method => {
+      this.middlewarePerMethod[method] = toArray(middlewareMap[method]);
+    });
   }
 
   /**
-   * Registers a route handler for a specific HTTP method.
-   * Overrides EventEmitter's on method to provide type safety and prevent duplicate registrations.
-   *
-   * @template M - The HTTP method type, must be a key of the Event interface
-   * @param method - The HTTP method to handle ('get', 'post', 'put', 'delete', etc.)
-   * @param listener - The route handler function that processes requests for this method
-   * @returns The RouteBuilder instance for method chaining
-   * @throws {Error} When a handler for the specified method is already registered
-   *
-   * @example
-   * ```typescript
-   * route
-   *   .on('get', async (req) => Response.json({ users: [] }))
-   *   .on('post', async (req) => {
-   *     const body = await req.json();
-   *     return Response.json({ created: body }, { status: 201 });
-   *   });
-   * ```
+   * Defines validation schemas and returns a new typed instance of the builder.
+   * @param method The HTTP method to define schemas for.
+   * @param schemaCallback A function that receives Zod and returns a schema object.
+   * @returns The RouteBuilder instance with updated types for chaining.
    */
-  public override on<M extends keyof E>(method: M, listener: E[M]): this {
-    if (this.handlers.has(method)) {
-      throw new Error(`Handler for ${String(method).toUpperCase()} already defined.`);
-    }
+  public schema<M extends RouteMethod, S extends ValidationSchemas>(
+    method: M,
+    schemaCallback: (zod: typeof z) => S,
+  ): RouteBuilder<Schemas & { [K in M]: S }> {
+    if (this.schemas.has(method)) throw new Error(`Schemas for ${String(method).toUpperCase()} already defined.`);
 
-    this.handlers.set(method, listener as RouteHandler);
-    return super.on(method as any, listener);
+    this.schemas.set(method, schemaCallback(z));
+
+    const currentMiddleware = this.middlewarePerMethod[method as RouteMethod];
+    this.middlewarePerMethod[method as RouteMethod] = [...currentMiddleware, this._validateSchema(method)];
+
+    return this as unknown as RouteBuilder<Schemas & { [K in M]: S }>;
   }
 
   /**
-   * Builds a route table object optimized for Bun.serve integration.
-   * Combines all registered handlers with their middleware into uppercase HTTP method keys.
-   *
-   * The execution flow for each request:
-   * 1. Execute middleware functions in sequence
-   * 2. If middleware returns a Response, short-circuit and return it
-   * 3. If middleware returns false, return 403 Forbidden
-   * 4. If all middleware passes (returns void/true), execute the main handler
-   * 5. Wrap non-Response handler results in Response.json()
-   *
-   * @returns Object with uppercase HTTP method keys (GET, POST, etc.) mapped to route handlers
-   *
-   * @example Basic usage with Bun.serve
-   * ```typescript
-   * const userRoutes = new RouteBuilder();
-   * userRoutes.on('get', async () => ({ users: [] }));
-   *
-   * const server = Bun.serve({
-   *   fetch(req) {
-   *     const url = new URL(req.url);
-   *     if (url.pathname === '/users') {
-   *       const handlers = userRoutes.build();
-   *       const handler = handlers[req.method.toUpperCase()];
-   *       return handler ? handler(req) : new Response('Method Not Allowed', { status: 405 });
-   *     }
-   *     return new Response('Not Found', { status: 404 });
-   *   }
-   * });
-   * ```
-   *
-   * @example Route table structure
-   * ```typescript
-   * // Returns object like:
-   * {
-   *   GET: (req) => Promise<Response>,
-   *   POST: (req) => Promise<Response>,
-   *   PUT: (req) => Promise<Response>
-   * }
-   * ```
+   * Registers a route handler with a type-safe request object based on defined schemas.
+   * @param method The HTTP method to handle.
+   * @param listener The route handler function. Its `request` parameter will be automatically typed.
+   * @returns The RouteBuilder instance for method chaining.
    */
-  public build(): { [K in Uppercase<keyof E & string>]: RouteHandler } {
-    const routeTable = {} as {
-      [K in Uppercase<keyof E & string>]: RouteHandler;
+  public override on<M extends RouteMethod>(method: M, listener: TypedRouteHandler<Schemas[M]>): this {
+    if (this.handlers.has(method)) throw new Error(`Handler for ${String(method).toUpperCase()} already defined.`);
+
+    this.handlers.set(method, listener);
+    super.on(method, listener as RouteBuilderEvents<Schemas>[M]);
+
+    return this;
+  }
+
+  /**
+   * @internal Internal middleware to validate schemas and decorate the request object.
+   */
+  private _validateSchema(method: RouteMethod): Middleware {
+    return async (request: BunRequest) => {
+      const schemas = this.schemas.get(method);
+      if (schemas === undefined) return undefined;
+
+      try {
+        for (const part of validationParts) {
+          const schema = schemas[part.key];
+          if (schema === undefined) continue;
+
+          const data = await part.getData(request);
+          const result = schema.safeParse(data);
+
+          if (result.success === false)
+            return Response.json(
+              { 'error': `${part.name} validation failed`, 'issues': result.error.issues },
+              { 'status': 400 },
+            );
+          else (request as any)[part.key] = result.data;
+        }
+        return undefined;
+      } catch (error) {
+        if (error instanceof Error && error.message === 'Invalid JSON in request body')
+          return Response.json({ 'error': error.message }, { 'status': 400 });
+
+        return Response.json({ 'error': 'Schema validation error' }, { 'status': 500 });
+      }
     };
+  }
 
-    for (const [method, handler] of this.handlers) {
-      const upperCaseMethod = (method as string).toUpperCase() as Uppercase<keyof E & string>;
+  /**
+   * Builds the final route table object for use with `Bun.serve`.
+   * @returns An object with uppercase HTTP method keys mapped to their fully-configured handlers.
+   */
+  public build(): { [K in Uppercase<string & keyof Schemas>]: RouteHandler } {
+    const routeTable = {} as { [K in Uppercase<string & keyof Schemas>]: RouteHandler };
 
+    for (const [method, handler] of this.handlers.entries()) {
+      const upperCaseMethod = (method as string).toUpperCase();
       const middlewareSequence = this.middlewarePerMethod[method as RouteMethod];
 
-      routeTable[upperCaseMethod] = async (request: BunRequest, server: Server) => {
-        for (const middlewareFunction of middlewareSequence) {
-          const middlewareResult = await middlewareFunction(request, server);
+      routeTable[upperCaseMethod as Uppercase<string & keyof Schemas>] = async (
+        request: BunRequest,
+        server: Server,
+      ) => {
+        for (const middleware of middlewareSequence) {
+          const result = await middleware(request, server);
 
-          if (middlewareResult instanceof Response) return middlewareResult;
-          if (middlewareResult === false) {
-            return new Response(null, { 'status': 403 });
-          }
+          if (result instanceof Response) return result;
+          if (result === false) return new Response(null, { 'status': 403 });
         }
 
         const handlerResult = await handler(request, server);
         return handlerResult instanceof Response ? handlerResult : Response.json(handlerResult);
       };
     }
-
     return routeTable;
   }
 }

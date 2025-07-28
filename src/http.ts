@@ -87,7 +87,7 @@ export default async (): Promise<void> => {
     },
 
     error(error) {
-      logger.error('Server error:', error);
+      logger.error(error, 'Internal Server Error');
 
       return Response.json({ 'error': 'Internal Server Error' }, { 'status': 500 });
     },

@@ -2,7 +2,6 @@ import RouteBuilder from '@structures/RouteBuilder';
 import logger from '@utils/logger';
 import walkDirectory from '@utils/walkDirectory';
 
-import type { HandlerReturn } from '@typings/routing';
 import type { MethodHandlers, RegisteredRoute, RoutesMap } from '@typings/server';
 import type { BunRequest, Server } from 'bun';
 
@@ -58,35 +57,53 @@ const buildRoutes = async (): Promise<RoutesMap> => {
   return routes;
 };
 
-/* == request dispatcher == */
+/* == route handler == */
 
-const dispatchRequest = async (request: BunRequest, routes: RoutesMap, server: Server): Promise<HandlerReturn> => {
-  const { pathname } = new URL(request.url);
-  const registeredRoute: RegisteredRoute = (routes[pathname] ?? routes['*']) as RegisteredRoute;
+const wrapRouteHandler = (handler: RegisteredRoute) => {
+  return async (request: BunRequest, server: Server): Promise<Response> => {
+    if (typeof handler === 'function') {
+      const result = await handler(request, server);
+      return result as Response;
+    }
 
-  if (typeof registeredRoute === 'function') return registeredRoute(request, server);
+    const methodHandler = handler[request.method.toUpperCase()];
+    if (methodHandler === undefined) {
+      return Response.json({ 'error': 'Method Not Allowed' }, { 'status': 405 });
+    }
 
-  const methodHandler = registeredRoute[request.method.toUpperCase()];
-  if (methodHandler === undefined) return Response.json({ 'error': 'Method Not Allowed' }, { 'status': 405 });
-
-  return methodHandler(request, server);
+    const result = await methodHandler(request, server);
+    return result as Response;
+  };
 };
 
 /* == bootstrap == */
 
 export default async (): Promise<void> => {
   const routes = await buildRoutes();
+  const bunRoutes: Record<string, (req: BunRequest, server: Server) => Promise<Response>> = {};
+
+  for (const [path, handler] of Object.entries(routes)) {
+    if (path === '*') continue;
+
+    bunRoutes[path] = wrapRouteHandler(handler as RegisteredRoute);
+  }
 
   const server = Bun.serve({
     'port': Number(process.env.PORT) || 3000,
     'hostname': process.env.HOST || 'localhost',
-    'fetch': async request => {
-      const result = await dispatchRequest(request as BunRequest, routes, server);
+    'routes': bunRoutes,
+    'fetch': async (request: Request): Promise<Response> => {
+      const catchAllHandler = routes['*'] as RegisteredRoute;
+      if (typeof catchAllHandler === 'function') {
+        const result = await catchAllHandler(request as BunRequest, server);
 
-      return result as Response;
+        return result instanceof Response ? result : Response.json(result);
+      }
+
+      return Response.json({ 'error': 'Not found' }, { 'status': 404 });
     },
 
-    error(error) {
+    error(error: Error): Response {
       logger.error(error, 'Internal Server Error');
 
       return Response.json({ 'error': 'Internal Server Error' }, { 'status': 500 });

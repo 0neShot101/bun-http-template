@@ -11,7 +11,7 @@ export type HandlerReturn = Response | Promise<Response> | Record<string, unknow
 /**
  * Function that responds to an HTTP request for its verb.
  */
-export type RouteHandler = (req: BunRequest, server: Server) => HandlerReturn;
+export type RouteHandler = (req: BunRequest, server: Server<BunRequest>) => HandlerReturn;
 
 /**
  * Middleware:
@@ -21,7 +21,7 @@ export type RouteHandler = (req: BunRequest, server: Server) => HandlerReturn;
  */
 export type MiddlewareResult = void | true | false | Response | Promise<void | true | false | Response>;
 
-export type Middleware = (req: BunRequest, server: Server) => MiddlewareResult;
+export type Middleware = (req: BunRequest, server: Server<BunRequest>) => MiddlewareResult;
 
 export type MiddlewareMap = {
   [M in RouteMethod]?: Middleware | Middleware[];
@@ -40,5 +40,5 @@ export interface Route {
 
   on<M extends keyof Event>(event: M, listener: Event[M]): this;
 
-  run<M extends keyof Event>(event: M, req: BunRequest, server: Server): HandlerReturn;
+  run<M extends keyof Event>(event: M, req: BunRequest, server: Server<BunRequest>): HandlerReturn;
 }

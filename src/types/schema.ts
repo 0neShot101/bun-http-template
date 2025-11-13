@@ -17,8 +17,8 @@ export type ValidatedRequest<S extends ValidationSchemas> = BunRequest & Validat
  * decorated `ValidatedRequest`. Otherwise, it receives a standard `BunRequest`.
  */
 export type TypedRouteHandler<S extends ValidationSchemas | undefined> = S extends ValidationSchemas
-  ? (request: ValidatedRequest<S>, server: Server) => any
-  : (request: BunRequest, server: Server) => any;
+  ? (request: ValidatedRequest<S>, server: Server<BunRequest>) => any
+  : (request: BunRequest, server: Server<BunRequest>) => any;
 
 /* == Internal Types for Inference == */
 

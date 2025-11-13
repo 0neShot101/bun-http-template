@@ -2,7 +2,7 @@ import type { HandlerReturn } from '@typings/routing';
 import type { BunRequest, Server } from 'bun';
 
 /* == HTTP primitives == */
-export type SimpleRouteHandler = (request: BunRequest, server: Server) => HandlerReturn;
+export type SimpleRouteHandler = (request: BunRequest, server: Server<BunRequest>) => HandlerReturn;
 
 /* == HTTP method handlers == */
 export type MethodHandlers = Record<string, SimpleRouteHandler>;

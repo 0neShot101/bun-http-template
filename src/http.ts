@@ -1,5 +1,5 @@
 import RouteBuilder from '@structures/RouteBuilder';
-import logger from '@utils/logger';
+import { logger } from '@utils/logger';
 import walkDirectory from '@utils/walkDirectory';
 
 import type { MethodHandlers, RegisteredRoute, RoutesMap } from '@typings/server';
@@ -47,7 +47,7 @@ const buildRoutes = async (): Promise<RoutesMap> => {
 
         logger.info(`↪ [${verbs}] ${endpoint}`);
       } catch (error) {
-        logger.error(`Failed to load ${filePath}`, error);
+        logger.error(`Failed to load ${filePath}: ${error}`);
       }
     }),
   );
@@ -60,7 +60,7 @@ const buildRoutes = async (): Promise<RoutesMap> => {
 /* == route handler == */
 
 const wrapRouteHandler = (handler: RegisteredRoute) => {
-  return async (request: BunRequest, server: Server): Promise<Response> => {
+  return async (request: BunRequest, server: Server<BunRequest>): Promise<Response> => {
     if (typeof handler === 'function') {
       const result = await handler(request, server);
       return result as Response;
@@ -80,7 +80,7 @@ const wrapRouteHandler = (handler: RegisteredRoute) => {
 
 export default async (): Promise<void> => {
   const routes = await buildRoutes();
-  const bunRoutes: Record<string, (req: BunRequest, server: Server) => Promise<Response>> = {};
+  const bunRoutes: Record<string, (req: BunRequest, server: Server<BunRequest>) => Promise<Response>> = {};
 
   for (const [path, handler] of Object.entries(routes)) {
     if (path === '*') continue;

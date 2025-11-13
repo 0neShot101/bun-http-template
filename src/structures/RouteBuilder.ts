@@ -161,7 +161,7 @@ export default class RouteBuilder<
 
       routeTable[upperCaseMethod as Uppercase<string & keyof Schemas>] = async (
         request: BunRequest,
-        server: Server,
+        server: Server<BunRequest>,
       ) => {
         for (const middleware of middlewareSequence) {
           const result = await middleware(request, server);

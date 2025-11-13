@@ -18,4 +18,4 @@ const loggerOptions =
         'level': 'debug',
       };
 
-export default pino(loggerOptions);
+export const logger = pino(loggerOptions);

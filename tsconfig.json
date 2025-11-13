@@ -32,7 +32,6 @@
     "allowUnreachableCode": false,
 
     // Project structure
-    "baseUrl": "./",
     "paths": {
       "@/*": ["./src/*"],
       "@typings/*": ["./src/types/*"],
